@@ -16,9 +16,16 @@ with st.sidebar:
     elif provider == "GROQ":
         model_name = st.selectbox("Model", ["llama-3.3-70b-versatile"])
 
-    # Save provider and model to session state
+    # Temperature slider
+    temperature = st.slider("Temperature (randomness)", min_value=0.0, max_value=2.0, value=1.0, step=0.01)
+    # Max tokens input
+    max_tokens = st.number_input("Max Tokens", min_value=1, max_value=700, value=500, step=1)
+
+    # Save provider, model, and new settings to session state
     st.session_state.provider = provider    
     st.session_state.model_name = model_name
+    st.session_state.temperature = temperature
+    st.session_state.max_tokens = max_tokens
 
 if st.session_state.get("provider") == "OpenAI":
     client = OpenAI(api_key=config.OPEN_AI_KEY)
@@ -27,17 +34,22 @@ elif st.session_state.get("provider") == "GROQ":
 else:
     client = genai.Client(api_key=config.GOOGLE_AI_KEY)
 
-def run_llm(client, messages, max_tokens=500):
+def run_llm(client, messages, max_tokens=500, temperature=1.0):
     if st.session_state.provider == "Google":
         return client.models.generate_content(
             model=st.session_state.model_name,
             contents=[message["content"] for message in messages],
+            config=genai.types.GenerateContentConfig(
+                temperature=temperature,
+                max_output_tokens=max_tokens,
+                )
         ).text
     else:
         return client.chat.completions.create(
             model=st.session_state.model_name,
             messages=messages,
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
+            temperature=temperature
         ).choices[0].message.content
 
 if "messages" not in st.session_state:
@@ -53,6 +65,11 @@ if prompt := st.chat_input("Hello! How can I assist you today?"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        output = run_llm(client, st.session_state.messages)
+        output = run_llm(
+            client,
+            st.session_state.messages,
+            max_tokens=st.session_state.max_tokens,
+            temperature=st.session_state.temperature
+        )
         st.write(output)
     st.session_state.messages.append({"role": "assistant", "content": output})
