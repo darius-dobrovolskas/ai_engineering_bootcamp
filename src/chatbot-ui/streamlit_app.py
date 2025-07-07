@@ -88,5 +88,5 @@ if prompt := st.chat_input("Hello! How can I assist you today?"):
             top_k=st.session_state.top_k,
             temperature=st.session_state.temperature
         )
-        st.write(output)
+        st.write(output["answer"])
     st.session_state.messages.append({"role": "assistant", "content": output})
