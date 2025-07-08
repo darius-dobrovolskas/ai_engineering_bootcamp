@@ -1,5 +1,5 @@
 run-streamlit:
-	streamlit run src/chatbot-ui/streamlit_app.py
+	streamlit run src/chatbot_ui/streamlit_app.py
 
 build-docker-streamlit:
 	docker build -t streamlit_app:latest .
@@ -9,3 +9,8 @@ run-docker-streamlit:
 
 run-docker-compose:
 	docker compose up --build
+
+run-evals:
+	poetry install
+	$env:PYTHONPATH = ".\src"
+	>> poetry run python -m evals.eval_retriever

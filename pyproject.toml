@@ -4,6 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"
+packages = [{ include = "chatbot_ui", from = "src" }]
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -12,7 +13,6 @@ openai = "^1.91.0"
 python-dotenv = "^1.1.1"
 google-genai = "^1.22.0"
 groq = "^0.29.0"
-pydantic-settings = "^2.10.1"
 pydantic = "^2.11.7"
 streamlit = "^1.46.0"
 pandas = "^2.3.0"
@@ -20,6 +20,10 @@ matplotlib = "^3.10.3"
 seaborn = "^0.13.2"
 qdrant-client = "^1.14.3"
 langsmith = "^0.4.4"
+langchain-openai = "^0.3.27"
+ragas = "^0.2.15"
+rapidfuzz = "^3.13.0"
+pydantic-settings = "^2.1.0"
 
 
 [build-system]

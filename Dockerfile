@@ -21,10 +21,13 @@ COPY pyproject.toml poetry.lock ./
 RUN poetry install --no-interaction --no-root
 
 # Copy application code
-COPY src/chatbot-ui ./src/chatbot-ui
+COPY src/chatbot_ui ./src/chatbot_ui
+
+# Set PYTHONPATH so Python can find modules under /app/src
+ENV PYTHONPATH="/app/src"
 
 # Pre-compile Python files to bytcode
-RUN python -m compileall ./src/chatbot-ui/
+RUN python -m compileall ./src/chatbot_ui/
 
 # Create non-root user and set permissions
 RUN addgroup --system app && \
@@ -41,4 +44,4 @@ USER app
 EXPOSE 8501
 
 # Command to run the application
-CMD ["streamlit", "run", "src/chatbot-ui/streamlit_app.py", "--server.address=0.0.0.0"]
+CMD ["streamlit", "run", "src/chatbot_ui/streamlit_app.py", "--server.address=0.0.0.0"]
