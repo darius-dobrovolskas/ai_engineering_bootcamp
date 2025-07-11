@@ -7,6 +7,9 @@ build-docker-streamlit:
 run-docker-streamlit:
 	docker run -v ${PWD}/.env:/app/.env -p 8501:8501 streamlit_app:latest
 
+run-docker-qdrant:
+	docker run -p 6333:6333 -p 6334:6334 -v "$(pwd)/qdrant_storage:qdrant/storage:z" qdrant/qdrant
+
 run-docker-compose:
 	docker compose up --build
 

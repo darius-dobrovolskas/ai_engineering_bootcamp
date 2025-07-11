@@ -195,3 +195,5 @@ cython_debug/
 
 data/
 qdrant/storage/
+qdrant_storage/
+qdrant_snapshot/

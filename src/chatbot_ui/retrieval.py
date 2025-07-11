@@ -1,4 +1,11 @@
 import openai
+import instructor
+
+from pydantic import BaseModel
+from openai import OpenAI
+
+from qdrant_client import QdrantClient
+from qdrant_client.models import Prefetch, Filter, FieldCondition, MatchText, FusionQuery
 
 from langsmith import traceable, get_current_run_tree
 from chatbot_ui.core.config import config
@@ -36,11 +43,29 @@ def get_embedding(text,
         run_type="retriever"
 )
 def retrieve_context(query, qdrant_client, top_k):
+
     query_embedding = get_embedding(query)
-    print("Embedding length:", len(query_embedding)) 
+
     results = qdrant_client.query_points(
-        collection_name=f"{config.QDRANT_COLLECTION_NAME}",
-        query=query_embedding,
+        collection_name="Amazon-items-collection-01-hybrid", # config.QDRANT_COLLECTION_NAME   
+        prefetch=[
+            Prefetch(
+                query=query_embedding,
+                limit=20
+            ),
+            Prefetch(
+                filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key="text",
+                            match=MatchText(text=query)
+                        )
+                    ]
+                ),
+                limit=20
+            )
+        ],
+        query=FusionQuery(fusion="rrf"),
         limit=top_k
     )
 
@@ -96,27 +121,36 @@ def build_prompt(context, question):
 
     return prompt
 
+
+class RAGGenerationResponse(BaseModel): 
+    answer: str
+
+
 @traceable(
         name="generate_llm",
         run_type="llm",
         metadata={"ls_provider": config.GENERATION_MODEL_PROVIDER, "ls_model_name": config.GENERATION_MODEL}
 )
 def generate_answer(prompt, temperature):
-    response = openai.chat.completions.create(
+
+    client = instructor.from_openai(OpenAI(api_key=openai.api_key))
+
+    response, raw_response = client.chat.completions.create_with_completion(
         model="gpt-4.1",
+        response_model=RAGGenerationResponse,
         messages=[{"role": "user", "content": prompt}],
-        temperature=temperature,
+        temperature=0.5,
     )
 
     current_run = get_current_run_tree()
     if current_run:
         current_run.metadata["usage_metadata"] = {
-            "input_tokens": response.usage.prompt_tokens,
-            "output_tokens": response.usage.completion_tokens,
-            "total_tokens": response.usage.total_tokens
+            "input_tokens": raw_response.usage.prompt_tokens,
+            "output_tokens": raw_response.usage.completion_tokens,
+            "total_tokens": raw_response.usage.total_tokens
         }
 
-    return response.choices[0].message.content
+    return response
 
 @traceable(
         name="rag_pipeline"
