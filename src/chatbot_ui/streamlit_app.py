@@ -1,11 +1,12 @@
 import streamlit as st
 import requests
 
-from chatbot_ui.core.config import config
+from chatbot_ui.core.config import config, settings
 
 st.set_page_config(
     page_title="Ecommerce Assistant",
     layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 def api_call(method, url, **kwargs):
@@ -40,10 +41,42 @@ def api_call(method, url, **kwargs):
         _show_error_popup(f"An unexpected error occured: {str(e)}")
         return False, {"message": str(e)}
 
+if "retrieved_items" not in st.session_state:
+    st.session_state.retrieved_items = []
 
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": "Hello! How can I assist you today?"}]
 
+if "query_counter" not in st.session_state:
+    st.session_state.query_counter = 0
+
+if "sidebar_key" not in st.session_state:
+    st.session_state.sidebar_key = 0
+
+if "sidebar_placeholder" not in st.session_state:
+    st.session_state.sidebar_placeholder = None
+
+# Sidebar
+with st.sidebar:
+    st.markdown("### Suggestions")
+
+    if st.session_state.sidebar_placeholder is None:
+        st.session_state.sidebar_placeholder = st.empty()
+
+    with st.session_state.sidebar_placeholder.container():
+        if st.session_state.retrieved_items:
+            for idx, item in enumerate(st.session_state.retrieved_items):
+                st.divider()
+                st.caption(item.get('description', 'No description'))
+                if 'image_url' in item:
+                    st.image(item["image_url"], width=300)
+                st.caption(f"Price: {item['price']} USD")
+        else:
+            st.info("No suggestions yet")
+
+# Chat interface
+
+# Display all messages
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
@@ -53,7 +86,16 @@ if prompt := st.chat_input("Hello! How can I assist you today?"):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    with st.chat_message("assistant"):
-        status, output = api_call("post", f"{config.API_URL}/rag", json={"query": prompt})
-        st.write(output.get("answer"))
-    st.session_state.messages.append({"role": "assistant", "content": output})
+    with st.spinner("Thinking..."):
+        status, output = api_call("post", f"{settings.API_URL}/rag", json={"query": prompt})
+        # Update retreived items
+        st.session_state.retrieved_items = output.get("used_image_urls", [])
+
+        # Clear the sidebar placeholder to force refresh
+        if st.session_state.sidebar_placeholder is not None:
+            st.session_state.sidebar_placeholder.empty()
+
+        response_content = output.get("answer", str(output))
+
+    st.session_state.messages.append({"role": "assistant", "content": response_content})
+    st.rerun()

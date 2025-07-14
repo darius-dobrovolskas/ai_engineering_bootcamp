@@ -14,8 +14,20 @@ class Config(BaseSettings):
     LANGSMITH_ENDPOINT: str
     LANGSMITH_API_KEY: str
     LANGSMITH_PROJECT: str
-    API_URL: str = "http://api:8000"
 
     model_config = SettingsConfigDict(env_file=".env")
 
+class Settings(BaseSettings):
+    """Application settings loaded from enviroment variables or .env file"""
+
+    API_URL: str = "http://api:8000"
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore"
+    )
+
+
 config = Config()
+settings = Settings()
