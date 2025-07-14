@@ -8,7 +8,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Prefetch, Filter, FieldCondition, MatchText, FusionQuery
 
 from langsmith import traceable, get_current_run_tree
-from chatbot_ui.core.config import config
+from api.core.config import config
 
 from dotenv import load_dotenv
 import os
@@ -131,7 +131,7 @@ class RAGGenerationResponse(BaseModel):
         run_type="llm",
         metadata={"ls_provider": config.GENERATION_MODEL_PROVIDER, "ls_model_name": config.GENERATION_MODEL}
 )
-def generate_answer(prompt, temperature):
+def generate_answer(prompt):
 
     client = instructor.from_openai(OpenAI(api_key=openai.api_key))
 
@@ -155,10 +155,10 @@ def generate_answer(prompt, temperature):
 @traceable(
         name="rag_pipeline"
 )
-def rag_pipeline(question, qdrant_client, top_k, temperature):
+def rag_pipeline(question, qdrant_client, top_k):
     retrieved_context = retrieve_context(question, qdrant_client, top_k)
     prompt = build_prompt(retrieved_context, question)
-    answer = generate_answer(prompt, temperature)
+    answer = generate_answer(prompt)
 
     final_result = {
         "answer": answer,
@@ -170,3 +170,11 @@ def rag_pipeline(question, qdrant_client, top_k, temperature):
     }
     return final_result
 
+
+def rag_pipeline_wrapper(question, top_k=5):
+    
+    qdrant_client = QdrantClient(url=config.QDRANT_URL)
+
+    result = rag_pipeline(question, qdrant_client, top_k)
+
+    return result["answer"].answer
