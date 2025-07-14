@@ -1,8 +1,10 @@
 import openai
 import instructor
+import json
 
 from pydantic import BaseModel
 from openai import OpenAI
+from typing import List
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import Prefetch, Filter, FieldCondition, MatchText, FusionQuery
@@ -91,10 +93,37 @@ def retrieve_context(query, qdrant_client, top_k):
 def process_context(context):
     formatted_context = ""
 
-    for chunk in context["retrieved_context"]:
-        formatted_context += f"- {chunk}\n" 
+    for id, chunk in zip(context["retrieved_context_ids"], context["retrieved_context"]):
+        formatted_context += f"- {id}: {chunk}\n" 
 
     return formatted_context
+
+
+OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "answer": {
+            "type": "string",
+            "description": "The answer to the question based on the provided context.",
+        },
+        "retrieved_context_ids": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "description": "The index of the chunk that was used to answer the question.",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Short description of the item based on the context together with the id.",
+                    },
+                },
+            },
+        },
+    },
+}
 
 @traceable(
         name="render_prompt",
@@ -111,7 +140,20 @@ def build_prompt(context, question):
 
     Instructions:
     - You need to answer the question based on the provided context only.
+    - Never use word context and refer to it as the available products.
+    - As an output you need to provide: 
 
+    * The answer to the question based on the provided context.
+    * The list of the indexes of the chunks that were used to answer the question. Only return the ones that are used in the answer.
+    * Short description of the item vased on the context.
+
+    - The answer to the question should contain detailed information about the product and returned with detailed specification in bulletpoints.
+    - The short description should have the name of the item.
+
+    <OUTPUT JSON SCHEMA>
+    {json.dumps(OUTPUT_SCHEMA, indent=2)}
+    </OUTPUT JSON SCHEMA>
+    
     Context:
     {processed_context}
 
@@ -122,8 +164,14 @@ def build_prompt(context, question):
     return prompt
 
 
+class RAGUsedContext(BaseModel):
+    id: int
+    description: str
+    
+
 class RAGGenerationResponse(BaseModel): 
     answer: str
+    retrieved_context_ids: List[RAGUsedContext]
 
 
 @traceable(
@@ -177,4 +225,20 @@ def rag_pipeline_wrapper(question, top_k=5):
 
     result = rag_pipeline(question, qdrant_client, top_k)
 
-    return result["answer"].answer
+    image_url_list = []
+
+    for id in result["answer"].retrieved_context_ids:
+        payload = qdrant_client.retrieve(
+            collection_name=config.QDRANT_COLLECTION_NAME,
+            ids=[id.id],
+        )[0].payload
+        image_url = payload.get("first_large_image")
+        price = payload.get("price")
+        if image_url:
+            image_url_list.append({"image_url": image_url, "price": price, "description": id.description})
+
+    return {
+        "answer": result["answer"].answer,
+        "retrieved_images": image_url_list
+    }
+
