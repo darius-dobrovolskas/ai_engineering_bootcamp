@@ -11,6 +11,7 @@ from qdrant_client.models import Prefetch, Filter, FieldCondition, MatchText, Fu
 
 from langsmith import traceable, get_current_run_tree
 from api.core.config import config
+from api.rag.utils.utils import prompt_template_config, prompt_template_registry
 
 from dotenv import load_dotenv
 import os
@@ -133,33 +134,10 @@ def build_prompt(context, question):
 
     processed_context = process_context(context)
 
-    prompt = f"""
-    You are an AI shopping assistant that can answer questions about the products in stock.
+    # prompt_template = prompt_template_config(config.RAG_PROMPT_TEMPLATE_PATH, "rag_generation")
+    prompt_template = prompt_template_registry("rag-prompt")
 
-    You will be given a question and a list of context.
-
-    Instructions:
-    - You need to answer the question based on the provided context only.
-    - Never use word context and refer to it as the available products.
-    - As an output you need to provide: 
-
-    * The answer to the question based on the provided context.
-    * The list of the indexes of the chunks that were used to answer the question. Only return the ones that are used in the answer.
-    * Short description of the item vased on the context.
-
-    - The answer to the question should contain detailed information about the product and returned with detailed specification in bulletpoints.
-    - The short description should have the name of the item.
-
-    <OUTPUT JSON SCHEMA>
-    {json.dumps(OUTPUT_SCHEMA, indent=2)}
-    </OUTPUT JSON SCHEMA>
-    
-    Context:
-    {processed_context}
-
-    Question:
-    {question}
-    """
+    prompt = prompt_template.render(processed_context=processed_context, question=question, output_json_schema=json.dumps(OUTPUT_SCHEMA, indent=2))
 
     return prompt
 
