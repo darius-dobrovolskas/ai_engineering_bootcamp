@@ -1,26 +1,45 @@
 import streamlit as st
-from qdrant_client import QdrantClient
+import requests
 
 from chatbot_ui.core.config import config
 
-from chatbot_ui.retrieval import rag_pipeline
-
-qdrant_client = QdrantClient(
-    url=f"http://{config.QDRANT_URL}:6333"
+st.set_page_config(
+    page_title="Ecommerce Assistant",
+    layout="wide",
 )
 
+def api_call(method, url, **kwargs):
 
-with st.sidebar:
-    st.title("Settings")
+    def _show_error_popup(message):
+        """Show error message as a popup in the top-right corner."""
+        st.session_state["error_popup"] = {
+            "visible": True,
+            "message": message,
+        }
 
-    # Temperature slider
-    temperature = st.slider("Temperature (randomness)", min_value=0.0, max_value=2.0, value=0.5, step=0.01)
-    # Limit of retrieved items
-    top_k = st.number_input("Number of retrieved items (top k)", min_value=1, max_value=10, value=5, step=1)
+    try:
+        response = getattr(requests, method)(url, **kwargs)
 
-    # Save provider, model, and new settings to session state
-    st.session_state.temperature = temperature
-    st.session_state.top_k = top_k
+        try:
+            response_data = response.json()
+        except requests.exceptions.JSONDecodeError:
+            response_data = {"message": "Invalidresponse format from server"}
+        
+        if response.ok:
+            return True, response_data
+        
+        return False, response_data
+    
+    except requests.exceptions.ConnectionError:
+        _show_error_popup("Connection error. Please check your network connection.")
+        return False, {"message": "Connection error"}
+    except requests.exceptions.Timeout:
+        _show_error_popup("The request timed out. Please try again.")
+        return False, {"message": "Request timeout"}
+    except requests.exceptions as e:
+        _show_error_popup(f"An unexpected error occured: {str(e)}")
+        return False, {"message": str(e)}
+
 
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": "Hello! How can I assist you today?"}]
@@ -35,11 +54,6 @@ if prompt := st.chat_input("Hello! How can I assist you today?"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        output = rag_pipeline(
-            prompt,
-            qdrant_client=qdrant_client,
-            top_k=st.session_state.top_k,
-            temperature=st.session_state.temperature
-        )
-        st.write(output["answer"].answer)
+        status, output = api_call("post", f"{config.API_URL}/rag", json={"query": prompt})
+        st.write(output.get("answer"))
     st.session_state.messages.append({"role": "assistant", "content": output})

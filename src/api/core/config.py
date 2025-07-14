@@ -14,8 +14,13 @@ class Config(BaseSettings):
     LANGSMITH_ENDPOINT: str
     LANGSMITH_API_KEY: str
     LANGSMITH_PROJECT: str
-    API_URL: str = "http://api:8000"
+
 
     model_config = SettingsConfigDict(env_file=".env")
 
+class Settings(BaseSettings):
+    DEFAULT_TIMEOUT: float = 30.0
+    VERSION: str = "0.1.0"
+
 config = Config()
+settings = Settings()
