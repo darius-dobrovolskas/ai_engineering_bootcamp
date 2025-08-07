@@ -60,9 +60,8 @@ workflow.add_conditional_edges(
 
 workflow.add_edge("tool_node", "agent_node")
 
-graph = workflow.compile()
 
-def run_agent(question: str):
+def run_agent(question: str, thread_id: str):
 
     initial_state = {
         "messages": [{"role": "user", "content": question}],
@@ -70,16 +69,22 @@ def run_agent(question: str):
         "available_tools": tool_descriptions
     }
 
-    result = graph.invoke(initial_state)
+    config = {"configurable": {"thread_id": thread_id}}
+
+    with PostgresSaver.from_conn_string("postgresql://langgraph_user:langgraph_password@postgres:5432/langgraph_db") as checkpointer:  #  config.POSTGRES_CONN_STRING
+
+        graph = workflow.compile(checkpointer=checkpointer)
+
+        result = graph.invoke(initial_state, config=config)
 
     return result
 
 
-def run_agent_wrapper(question: str):
+def run_agent_wrapper(question: str, thread_id: str):
 
     qdrant_client = QdrantClient(url=config.QDRANT_URL)
 
-    result = run_agent(question)
+    result = run_agent(question, thread_id)
 
     image_url_list = []
     for id in result.get("retrieved_context_ids"):

@@ -1,22 +1,24 @@
 from fastapi import APIRouter, Request
-from api.api.models import RAGRequest, RAGResponse, RAGUsedImage
 import logging
 
 from api.rag.graph import run_agent_wrapper
 
+from api.api.models import RAGRequest, RAGResponse, RAGUsedImage
+
+
 logger = logging.getLogger(__name__)
+
 rag_router = APIRouter()
+
 
 @rag_router.post("/rag")
 async def rag(
     request: Request,
     payload: RAGRequest
-    ) -> RAGResponse:
-    """RAG endpoint that returns a response"""
+) -> RAGResponse:
 
-    result = run_agent_wrapper(payload.query)
+    result = run_agent_wrapper(payload.query, payload.thread_id)
     used_image_urls = [RAGUsedImage(image_url=image["image_url"], price=image["price"], description=image["description"]) for image in result["retrieved_images"]]
-
 
     return RAGResponse(
         request_id=request.state.request_id,
@@ -26,4 +28,4 @@ async def rag(
 
 
 api_router = APIRouter()
-api_router.include_router(rag_router, tags =["rag"])
+api_router.include_router(rag_router, tags=["rag"])
