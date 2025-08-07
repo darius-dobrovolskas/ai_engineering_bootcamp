@@ -69,13 +69,13 @@ def run_agent(question: str, thread_id: str):
         "available_tools": tool_descriptions
     }
 
-    config = {"configurable": {"thread_id": thread_id}}
+    configuration = {"configurable": {"thread_id": thread_id}}
 
-    with PostgresSaver.from_conn_string("postgresql://langgraph_user:langgraph_password@postgres:5432/langgraph_db") as checkpointer:  #  config.POSTGRES_CONN_STRING
+    with PostgresSaver.from_conn_string(config.POSTGRES_CONN_STRING) as checkpointer:
 
         graph = workflow.compile(checkpointer=checkpointer)
 
-        result = graph.invoke(initial_state, config=config)
+        result = graph.invoke(initial_state, config=configuration)
 
     return result
 
