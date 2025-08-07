@@ -197,3 +197,4 @@ data/
 qdrant/storage/
 qdrant_storage/
 qdrant_snapshot/
+postgres_data/

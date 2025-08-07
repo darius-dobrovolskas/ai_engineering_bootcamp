@@ -6,7 +6,6 @@ from openai import OpenAI
 from langsmith import traceable, get_current_run_tree
 from langchain_core.messages import AIMessage
 
-#from api.rag.graph import State
 from api.rag.utils.utils import lc_messages_to_regular_messages
 from api.rag.utils.utils import prompt_template_config
 from api.core.config import config
