@@ -4,10 +4,13 @@ from operator import add
 
 from api.rag.agent import ToolCall, RAGUsedContext, agent_node
 from api.rag.utils.utils import get_tool_descriptions_from_node
-from api.rag.tools import get_formatted_context
+from api.rag.tools import get_formatted_item_context, get_formatted_review_context
 from api.core.config import config
 
+import numpy as np
+
 from qdrant_client import QdrantClient
+from qdrant_client.models import Filter, FieldCondition, MatchValue
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
@@ -29,7 +32,7 @@ def tool_router(state: State) -> str:
     
     if state.final_answer:
         return "end"
-    elif state.iteration > 2:
+    elif state.iteration > 5:
         return "end"
     elif len(state.tool_calls) > 0:
         return "tools"
@@ -39,7 +42,7 @@ def tool_router(state: State) -> str:
 
 workflow = StateGraph(State)
 
-tools = [get_formatted_context]
+tools = [get_formatted_item_context, get_formatted_review_context]
 tool_node = ToolNode(tools)
 
 tool_descriptions = get_tool_descriptions_from_node(tool_node)
@@ -87,11 +90,22 @@ def run_agent_wrapper(question: str, thread_id: str):
     result = run_agent(question, thread_id)
 
     image_url_list = []
+    dummy_vector = np.zeros(1536).tolist()
     for id in result.get("retrieved_context_ids"):
-        payload = qdrant_client.retrieve(
-            collection_name=config.QDRANT_COLLECTION_NAME,
-            ids=[id.id]
-        )[0].payload
+        payload = qdrant_client.query_points(
+            collection_name=config.QDRANT_COLLECTION_NAME_ITEMS,
+            query=dummy_vector,
+            query_filter=Filter(
+                must=[
+                    FieldCondition(
+                        key="parent_asin",
+                        match=MatchValue(value=id.id)
+                    )
+                ]
+            ),
+            with_payload=True,
+            limit=1
+        ).points[0].payload
         image_url = payload.get("first_large_image")
         price = payload.get("price")
         if image_url:
