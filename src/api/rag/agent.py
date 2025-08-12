@@ -61,6 +61,7 @@ def agent_node(state):
             "output_tokens": raw_response.usage.completion_tokens,
             "total_tokens": raw_response.usage.total_tokens,
         }
+        trace_id = str(getattr(current_run, "trace_id", current_run.id))
 
     if response.tool_calls and not response.final_answer:
         tool_calls = []
@@ -86,5 +87,6 @@ def agent_node(state):
         "iteration": state.iteration + 1,
         "answer": response.answer,
         "final_answer": response.final_answer,
-        "retrieved_context_ids": response.retrieved_context_ids
+        "retrieved_context_ids": response.retrieved_context_ids,
+        "trace_id": trace_id
     }

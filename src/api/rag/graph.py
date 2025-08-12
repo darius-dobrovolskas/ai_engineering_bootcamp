@@ -25,6 +25,7 @@ class State(BaseModel):
     available_tools: List[Dict[str, Any]] = []
     tool_calls: Optional[List[ToolCall]] = Field(default_factory=list)
     retrieved_context_ids: List[RAGUsedContext] = []
+    trace_id: str = ""
 
 
 def tool_router(state: State) -> str:
@@ -113,5 +114,6 @@ def run_agent_wrapper(question: str, thread_id: str):
 
     return {
         "answer": result.get("answer"),
-        "retrieved_images": image_url_list
+        "retrieved_images": image_url_list,
+        "trace_id": result.get("trace_id")
     }
