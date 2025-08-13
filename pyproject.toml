@@ -33,6 +33,8 @@ langgraph-prebuilt = "^0.5.2"
 langgraph-checkpoint-postgres = "^2.0.22"
 psycopg2-binary = "^2.9.10"
 psycopg = {extras = ["binary"], version = "^3.2.9"}
+fastmcp = "^2.11.3"
+mcp = {extras = ["cli"], version = "^1.12.4"}
 
 
 [build-system]
