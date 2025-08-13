@@ -1,5 +1,6 @@
 from typing import List
 from pydantic import BaseModel, Field
+from typing import Dict, Any
 
 import instructor
 from openai import OpenAI
@@ -13,6 +14,7 @@ from api.core.config import config
 class ToolCall(BaseModel):
     name: str
     arguments: dict
+    server: str
 
 class RAGUsedContext(BaseModel):
     id: str
