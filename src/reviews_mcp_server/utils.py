@@ -1,6 +1,6 @@
 import openai
 from qdrant_client import QdrantClient
-from qdrant_client.models import Filter, FieldCondition, MatchText, Prefetch, FusionQuery
+from qdrant_client.models import Filter, FieldCondition, MatchAny, Prefetch, FusionQuery
 
 from src.reviews_mcp_server.core.config import config
 

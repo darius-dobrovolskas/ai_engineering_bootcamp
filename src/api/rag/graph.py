@@ -3,8 +3,7 @@ from typing import List, Dict, Any, Annotated, Optional
 from operator import add
 
 from api.rag.agent import ToolCall, RAGUsedContext, agent_node
-from api.rag.utils.utils import get_tool_descriptions_from_node
-from api.rag.tools import get_formatted_item_context, get_formatted_review_context
+from api.rag.utils.utils import mcp_tool_node, get_tool_descriptions_from_mcp_servers
 from api.core.config import config
 
 import numpy as np
@@ -13,8 +12,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Filter, FieldCondition, MatchValue
 
 from langgraph.graph import StateGraph, START, END
-from langgraph.prebuilt import ToolNode
-from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 
 class State(BaseModel):
@@ -41,15 +39,12 @@ def tool_router(state: State) -> str:
         return "end"
 
 
+### WORKFLOW ###
+
 workflow = StateGraph(State)
 
-tools = [get_formatted_item_context, get_formatted_review_context]
-tool_node = ToolNode(tools)
-
-tool_descriptions = get_tool_descriptions_from_node(tool_node)
-
 workflow.add_node("agent_node", agent_node)
-workflow.add_node("tool_node", tool_node)
+workflow.add_node("mcp_tool_node", mcp_tool_node)
 
 workflow.add_edge(START, "agent_node")
 
@@ -57,15 +52,19 @@ workflow.add_conditional_edges(
     "agent_node",
     tool_router,
     {
-        "tools": "tool_node",
+        "tools": "mcp_tool_node",
         "end": END
     }
 )
 
-workflow.add_edge("tool_node", "agent_node")
+workflow.add_edge("mcp_tool_node", "agent_node")
 
 
-def run_agent(question: str, thread_id: str):
+async def run_agent(question: str, thread_id: str):
+
+    mcp_servers = ["http://items_mcp_server:8000/mcp", "http://reviews_mcp_server:8000/mcp"]
+
+    tool_descriptions = await get_tool_descriptions_from_mcp_servers(mcp_servers)
 
     initial_state = {
         "messages": [{"role": "user", "content": question}],
@@ -75,20 +74,20 @@ def run_agent(question: str, thread_id: str):
 
     configuration = {"configurable": {"thread_id": thread_id}}
 
-    with PostgresSaver.from_conn_string(config.POSTGRES_CONN_STRING) as checkpointer:
+    async with AsyncPostgresSaver.from_conn_string(config.POSTGRES_CONN_STRING) as checkpointer:
 
         graph = workflow.compile(checkpointer=checkpointer)
 
-        result = graph.invoke(initial_state, config=configuration)
+        result = await graph.ainvoke(initial_state, config=configuration)
 
     return result
 
 
-def run_agent_wrapper(question: str, thread_id: str):
+async def run_agent_wrapper(question: str, thread_id: str):
 
     qdrant_client = QdrantClient(url=config.QDRANT_URL)
 
-    result = run_agent(question, thread_id)
+    result = await run_agent(question, thread_id)
 
     image_url_list = []
     dummy_vector = np.zeros(1536).tolist()
