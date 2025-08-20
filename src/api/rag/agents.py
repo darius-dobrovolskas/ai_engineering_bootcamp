@@ -1,22 +1,26 @@
-from typing import List
 from pydantic import BaseModel, Field
-from typing import Dict, Any
-
+from typing import List
 import instructor
 from openai import OpenAI
 from langsmith import traceable, get_current_run_tree
 from langchain_core.messages import AIMessage
 
-from api.rag.utils.utils import lc_messages_to_regular_messages
+from api.rag.utils.utils import lc_messages_to_regular_messages, format_ai_message
 from api.rag.utils.utils import prompt_template_config
 from api.core.config import config
 
+
 client = instructor.from_openai(OpenAI(api_key=config.OPENAI_API_KEY))
+
+
+class MCPToolCall(BaseModel):
+    name: str
+    arguments: dict
+    server: str
 
 class ToolCall(BaseModel):
     name: str
     arguments: dict
-    server: str
 
 
 class RAGUsedContext(BaseModel):
@@ -26,7 +30,7 @@ class RAGUsedContext(BaseModel):
 
 class ProductQAAgentResponse(BaseModel):
     answer: str
-    tool_calls: List[ToolCall] = Field(default_factory=list)
+    tool_calls: List[MCPToolCall] = Field(default_factory=list)
     final_answer: bool = Field(default=False)
     retrieved_context_ids: List[RAGUsedContext]
 
@@ -34,6 +38,12 @@ class ProductQAAgentResponse(BaseModel):
 class IntentRouterAgentResponse(BaseModel):
     user_intent: str
     answer: str
+
+
+class ShoppingCartAgentResponse(BaseModel):
+    answer: str
+    tool_calls: List[ToolCall] = Field(default_factory=list)
+    final_answer: bool = Field(default=False)
 
 
 ### Product QA Agent ###
@@ -45,10 +55,10 @@ class IntentRouterAgentResponse(BaseModel):
 )
 def product_qa_agent_node(state):
 
-    template = prompt_template_config(config.RAG_PROMPT_TEMPLATE_PATH, "product_qa_agent")
+    prompt_template = prompt_template_config(config.RAG_PROMPT_TEMPLATE_PATH, "product_qa_agent")
 
-    prompt = template.render(
-        available_tools=state.available_tools
+    prompt = prompt_template.render(
+        available_tools=state.product_qa_available_tools
     )
 
     messages = state.messages
@@ -73,31 +83,15 @@ def product_qa_agent_node(state):
             "total_tokens": raw_response.usage.total_tokens,
         }
 
-    if response.tool_calls:
-        tool_calls = []
-        for i, tc in enumerate(response.tool_calls):
-            tool_calls.append({
-                "id": f"call_{i}",
-                "name": tc.name,
-                "args": tc.arguments
-            })
-
-        ai_message = AIMessage(
-            content=response.answer,
-            tool_calls=tool_calls
-            )
-    else:
-        ai_message = AIMessage(
-            content=response.answer,
-        )
+    ai_message = format_ai_message(response)
 
     return {
-      "messages": [ai_message],
-      "tool_calls": response.tool_calls,
-      "iteration": state.iteration + 1,
-      "answer": response.answer,
-      "final_answer": response.final_answer,
-      "retrieve_context_ids": response.retrieved_context_ids,
+        "messages": [ai_message],
+        "mcp_tool_calls": response.tool_calls,
+        "product_qa_iteration": state.product_qa_iteration + 1,
+        "answer": response.answer,
+        "final_answer": response.final_answer,
+        "retrieved_context_ids": response.retrieved_context_ids,
     }
 
 ### Intent Router Agent ###
@@ -111,9 +105,7 @@ def intent_router_agent_node(state) -> dict:
 
     prompt_template = prompt_template_config(config.RAG_PROMPT_TEMPLATE_PATH, "intent_router_agent")
 
-    prompt = prompt_template.render(
-        available_tools=state.available_tools
-    )
+    prompt = prompt_template.render()
 
     messages = state.messages
 
@@ -152,4 +144,56 @@ def intent_router_agent_node(state) -> dict:
         "answer": response.answer,
         "user_intent": response.user_intent,
         "trace_id": trace_id
+    }
+
+
+### Shopping Cart Agent ###
+
+@traceable(
+    name="shopping_cart_agent",
+    run_type="llm",
+    metadata={"ls_provider": "openai", "ls_model_name": "gpt-4.1"}
+)
+def shopping_cart_agent_node(state) -> dict:
+
+    prompt_template = prompt_template_config(config.RAG_PROMPT_TEMPLATE_PATH, "shopping_cart_agent")
+
+    prompt = prompt_template.render(
+        available_tools=state.shopping_cart_available_tools,
+        user_id=state.user_id,
+        cart_id=state.cart_id
+    )
+
+    messages = state.messages
+
+    conversation = []
+
+    for msg in messages:
+        conversation.append(lc_messages_to_regular_messages(msg))
+
+    client = instructor.from_openai(OpenAI())
+
+    response, raw_response = client.chat.completions.create_with_completion(
+        model="gpt-4.1",
+        response_model=ShoppingCartAgentResponse,
+        messages=[{"role": "system", "content": prompt}, *conversation],
+        temperature=0,
+    )
+
+    current_run = get_current_run_tree()
+    if current_run:
+        current_run.metadata["usage_metadata"] = {
+            "input_tokens": raw_response.usage.prompt_tokens,
+            "output_tokens": raw_response.usage.completion_tokens,
+            "total_tokens": raw_response.usage.total_tokens,
+        }
+
+        ai_message = format_ai_message(response)
+
+    return {
+        "messages": [ai_message],
+        "tool_calls": response.tool_calls,
+        "shopping_cart_iteration": state.shopping_cart_iteration + 1,
+        "answer": response.answer,
+        "final_answer": response.final_answer
     }
