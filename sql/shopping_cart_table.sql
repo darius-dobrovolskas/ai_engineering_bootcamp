@@ -1,3 +1,6 @@
+--!!! first connect to postgres -> psql -U langgraph_user -d "langgraph_db";
+-- second create a schema!!! -> CREATE SCHEMA shopping_carts;
+
 CREATE TABLE shopping_carts.shopping_cart_items (
     id SERIAL PRIMARY KEY,
     user_id VARCHAR(255) NOT NULL,
