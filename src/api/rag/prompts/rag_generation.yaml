@@ -99,9 +99,13 @@ prompts:
         next_agent="...", final_answer=false
         - After receiving agent results, you can then set:
         next_agent="", final_answer=true
+        - One of the following has to be true:
+        next_agent is "" and final_answer is true
+        next_agent is not "" and final_answer is false
 
         Additional instructions:
 
+        - Do not route to any agent if the user's query needs clarification. Clarify it yourself by setting next_agent to "" and final_answer to True.
         - Write the plan to the plan field.
         - Write the next agent to invoke to the next_agent field.
         - Once you have all the information needed to answer the user's query, you should set the final_answer field to True and output the answer to the user's query.
