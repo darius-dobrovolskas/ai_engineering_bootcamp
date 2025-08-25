@@ -17,3 +17,8 @@ run-evals:
 	poetry install
 	$env:PYTHONPATH = ".\src"
 	>> poetry run python -m evals.eval_retriever
+
+run-evals-coordinator:
+    poetry install
+	$env:PYTHONPATH = (Join-Path (Get-Location) 'src') + ';' + ($env:PYTHONPATH)
+	poetry run python -m evals.eval_coordinator_agent
