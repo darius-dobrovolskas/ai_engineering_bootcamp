@@ -34,7 +34,7 @@ class State(BaseModel):
     trace_id: str = ""
     user_id: str = ""
     cart_id: str = ""
-    plan: List[Delegation] = Field(default_factory=list)
+    plan: list[Delegation] = Field(default_factory=list)
     next_agent: str = ""
 
 
@@ -146,7 +146,7 @@ async def run_agent(question: str, thread_id: str):
         "shopping_cart_available_tools": shopping_cart_tool_descriptions,
         "product_qa_final_answer": False,
         "shopping_cart_final_answer": False,
-        "coordinator_final_answer": False,
+        "coordinator_final_answer": False
     }
 
     configuration = {"configurable": {"thread_id": thread_id}}
