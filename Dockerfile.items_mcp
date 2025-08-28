@@ -17,6 +17,9 @@ ENV POETRY_VIRTUALENVS_CREATE=false
 # Copy only dependency files first for better layer cashing
 COPY pyproject.toml poetry.lock ./
 
+# Copy litellm
+COPY litellm ./litellm
+
 # Install dependencies
 RUN poetry install --no-interaction --no-root
 
