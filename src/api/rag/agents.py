@@ -61,7 +61,7 @@ class ShoppingCartAgentResponse(BaseModel):
     run_type="llm",
     metadata={"ls_provider": config.GENERATION_MODEL_PROVIDER, "ls_model_name": config.GENERATION_MODEL}
 )
-def product_qa_agent_node(state, models = ["gpt-4.1", "groq/llama-3.3-70b-versatile"]) -> dict:
+def product_qa_agent_node(state, models = ["gpt-4.1", "groq/llama-3.3-70b-versatile"]):
 
     prompts = {}
 
@@ -103,12 +103,12 @@ def product_qa_agent_node(state, models = ["gpt-4.1", "groq/llama-3.3-70b-versat
     ai_message = format_ai_message(response)
 
     return {
-      "messages": [ai_message],
-      "mcp_tool_calls": response.tool_calls,
-      "product_qa_iteration": state.product_qa_iteration + 1,
-      "answer": response.answer,
-      "product_qa_final_answer": response.final_answer,
-      "retrieved_context_ids": response.retrieved_context_ids,
+        "messages": [ai_message],
+        "mcp_tool_calls": response.tool_calls,
+        "product_qa_iteration": state.product_qa_iteration + 1,
+        "answer": response.answer,
+        "product_qa_final_answer": response.final_answer,
+        "retrieved_context_ids": response.retrieved_context_ids,
     }
 
 ### Coordinator Agent ###
@@ -116,7 +116,7 @@ def product_qa_agent_node(state, models = ["gpt-4.1", "groq/llama-3.3-70b-versat
 @traceable(
     name="coordinator_agent",
     run_type="llm",
-    metadata={"ls_provider": "openai", "ls_model_name": "gpt-4.1"}
+    metadata={"ls_provider": config.GENERATION_MODEL_PROVIDER, "ls_model_name": config.GENERATION_MODEL}
 )
 def coordinator_agent_node(state, models = ["gpt-4.1", "groq/llama-3.3-70b-versatile"]) -> dict:
 
@@ -124,9 +124,7 @@ def coordinator_agent_node(state, models = ["gpt-4.1", "groq/llama-3.3-70b-versa
 
     for model in models:
         prompt_template = prompt_template_config(config.COORDINATOR_AGENT_PROMPT_TEMPLATE_PATH, model)
-        prompt = prompt_template.render(
-            available_tools=state.product_qa_available_tools
-        )
+        prompt = prompt_template.render()
         prompts[model] = prompt
 
     messages = state.messages
@@ -135,7 +133,6 @@ def coordinator_agent_node(state, models = ["gpt-4.1", "groq/llama-3.3-70b-versa
 
     for msg in messages:
         conversation.append(lc_messages_to_regular_messages(msg))
-
 
     for model in models:
         try:
@@ -172,7 +169,7 @@ def coordinator_agent_node(state, models = ["gpt-4.1", "groq/llama-3.3-70b-versa
         "next_agent": response.next_agent,
         "plan": response.plan,
         "coordinator_final_answer": response.final_answer,
-        "coordinator_iteration": state.coordinator_iteration +1,
+        "coordinator_iteration": state.coordinator_iteration + 1,
         "trace_id": trace_id
     }
 
@@ -191,7 +188,9 @@ def shopping_cart_agent_node(state, models = ["gpt-4.1", "groq/llama-3.3-70b-ver
     for model in models:
         prompt_template = prompt_template_config(config.SHOPPING_CART_AGENT_PROMPT_TEMPLATE_PATH, model)
         prompt = prompt_template.render(
-            available_tools=state.shopping_cart_available_tools
+            available_tools=state.shopping_cart_available_tools,
+            user_id=state.user_id,
+            cart_id=state.cart_id
         )
         prompts[model] = prompt
 
@@ -201,7 +200,6 @@ def shopping_cart_agent_node(state, models = ["gpt-4.1", "groq/llama-3.3-70b-ver
 
     for msg in messages:
         conversation.append(lc_messages_to_regular_messages(msg))
-
 
     for model in models:
         try:
@@ -224,12 +222,12 @@ def shopping_cart_agent_node(state, models = ["gpt-4.1", "groq/llama-3.3-70b-ver
             "total_tokens": raw_response.usage.total_tokens,
         }
 
-        ai_message = format_ai_message(response)
+    ai_message = format_ai_message(response)
 
     return {
-      "messages": [ai_message],
-      "tool_calls": response.tool_calls,
-      "shopping_cart_iteration": state.shopping_cart_iteration + 1,
-      "answer": response.answer,
-      "shopping_cart_final_answer": response.final_answer
+        "messages": [ai_message],
+        "tool_calls": response.tool_calls,
+        "shopping_cart_iteration": state.shopping_cart_iteration + 1,
+        "answer": response.answer,
+        "shopping_cart_final_answer": response.final_answer
     }
